@@ -15,6 +15,8 @@
 #include "userprog/process.h"
 #endif
 
+bool high_priority (struct list_elem *l, struct list_elem *s, void *aux UNUSED);
+void check_priority (void);
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -206,7 +208,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-
+	check_priority();
 	return tid;
 }
 
@@ -240,7 +242,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	// list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &t->elem, high_priority, 0);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -303,7 +306,8 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		// list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, high_priority, 0);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -312,6 +316,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	check_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -587,4 +592,15 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+/*핀토스*/
+bool high_priority (struct list_elem *a, struct list_elem *b, void *aux UNUSED)
+{
+	return list_entry (a, struct thread, elem)->priority > list_entry (b, struct thread, elem)->priority;
+}
+void check_priority (void)
+{
+    if (!list_empty (&ready_list) && thread_current ()->priority < list_entry (list_front (&ready_list), struct thread, elem)->priority)
+    thread_yield ();
 }
